@@ -141,6 +141,49 @@ textarea {
         linear-gradient(180deg, rgba(255, 252, 247, 0.98), rgba(238, 246, 251, 0.96));
 }
 
+.hero-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+}
+
+.connection-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+}
+
+.connection-badge::before {
+    content: "";
+    display: block;
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: currentColor;
+}
+
+.connection-badge--online {
+    background: rgba(52, 211, 153, 0.18);
+    color: #087f5b;
+}
+
+.connection-badge--degraded {
+    background: rgba(251, 191, 36, 0.22);
+    color: #936500;
+}
+
+.connection-badge--offline {
+    background: rgba(248, 113, 113, 0.18);
+    color: #b74141;
+}
+
 .hero-panel strong,
 .metric-card strong,
 .signal-card strong {
