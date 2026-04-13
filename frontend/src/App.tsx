@@ -242,7 +242,12 @@ const App = () => {
                     </div>
                 </div>
                 <div className="hero-panel">
-                    <span>Current workspace</span>
+                    <div className="hero-panel__header">
+                        <span>Current workspace</span>
+                        <span className={`connection-badge connection-badge--${syncMode}`}>
+                            {syncMode}
+                        </span>
+                    </div>
                     <strong>{detail.name}</strong>
                     <p>{detail.summary}</p>
                     <div className="hero-panel__meta">
