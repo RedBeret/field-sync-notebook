@@ -376,22 +376,40 @@ const App = () => {
                             <textarea
                                 value={noteDraft}
                                 onChange={(event) => setNoteDraft(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                                        event.preventDefault();
+                                        addNote();
+                                    }
+                                }}
                                 placeholder="Log what happened while it is still fresh."
                             />
-                            <button className="action-button" onClick={addNote} type="button">
-                                Queue note
-                            </button>
+                            <div className="composer-footer">
+                                <button className="action-button" onClick={addNote} type="button">
+                                    Queue note
+                                </button>
+                                <span className="composer-hint">Ctrl+Enter</span>
+                            </div>
                         </div>
                         <div className="composer-card">
                             <span>Add task</span>
                             <textarea
                                 value={taskDraft}
                                 onChange={(event) => setTaskDraft(event.target.value)}
+                                onKeyDown={(event) => {
+                                    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+                                        event.preventDefault();
+                                        addTask();
+                                    }
+                                }}
                                 placeholder="Capture the follow-up before the next shift arrives."
                             />
-                            <button className="action-button" onClick={addTask} type="button">
-                                Queue task
-                            </button>
+                            <div className="composer-footer">
+                                <button className="action-button" onClick={addTask} type="button">
+                                    Queue task
+                                </button>
+                                <span className="composer-hint">Ctrl+Enter</span>
+                            </div>
                         </div>
                     </div>
                     <button className="primary-button" onClick={runSync} type="button">

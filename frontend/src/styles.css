@@ -234,6 +234,21 @@ textarea {
     color: #182433;
 }
 
+.composer-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 10px;
+}
+
+.composer-hint {
+    font-size: 11px;
+    color: rgba(30, 45, 65, 0.4);
+    font-family: "IBM Plex Mono", monospace;
+    white-space: nowrap;
+}
+
 .control input,
 .control select {
     min-height: 46px;
