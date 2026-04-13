@@ -131,6 +131,15 @@ const App = () => {
     });
 
     const queueCount = pendingNotes.length + pendingTasks.length;
+    const emptyWorkspaces = filteredWorkspaces.length === 0;
+
+    const removeQueuedNote = (noteId: string) => {
+        setPendingNotes((current) => current.filter((note) => note.id !== noteId));
+    };
+
+    const removeQueuedTask = (taskId: string) => {
+        setPendingTasks((current) => current.filter((task) => task.id !== taskId));
+    };
 
     const addNote = () => {
         if (!noteDraft.trim()) {
@@ -278,32 +287,38 @@ const App = () => {
                             onChange={(event) => setSearch(event.target.value)}
                         />
                     </label>
-                    <div className="workspace-list">
-                        {filteredWorkspaces.map((workspace) => (
-                            <button
-                                key={workspace.id}
-                                className={`workspace-card${
-                                    workspace.id === detail.id ? " is-active" : ""
-                                }`}
-                                onClick={() => setSelectedWorkspaceId(workspace.id)}
-                                type="button"
-                            >
-                                <div className="workspace-card__top">
-                                    <div>
-                                        <strong>{workspace.name}</strong>
-                                        <span>{workspace.region}</span>
+                    {emptyWorkspaces ? (
+                        <div className="empty-state">
+                            No workspaces match the current search.
+                        </div>
+                    ) : (
+                        <div className="workspace-list">
+                            {filteredWorkspaces.map((workspace) => (
+                                <button
+                                    key={workspace.id}
+                                    className={`workspace-card${
+                                        workspace.id === detail.id ? " is-active" : ""
+                                    }`}
+                                    onClick={() => setSelectedWorkspaceId(workspace.id)}
+                                    type="button"
+                                >
+                                    <div className="workspace-card__top">
+                                        <div>
+                                            <strong>{workspace.name}</strong>
+                                            <span>{workspace.region}</span>
+                                        </div>
+                                        <span className={`badge badge--${workspace.syncState}`}>
+                                            {workspace.syncState}
+                                        </span>
                                     </div>
-                                    <span className={`badge badge--${workspace.syncState}`}>
-                                        {workspace.syncState}
-                                    </span>
-                                </div>
-                                <p>{workspace.summary}</p>
-                                <div className="workspace-card__meta">
-                                    <span>{workspace.pending} pending</span>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
+                                    <p>{workspace.summary}</p>
+                                    <div className="workspace-card__meta">
+                                        <span>{workspace.pending} pending</span>
+                                    </div>
+                                </button>
+                            ))}
+                        </div>
+                    )}
                 </article>
 
                 <article className="panel">
@@ -336,6 +351,23 @@ const App = () => {
                             <em className={`trend trend--${syncMode}`}>
                                 {syncMode}
                             </em>
+                        </div>
+                    </div>
+                    <div className="queue-summary">
+                        <div className="signal-card">
+                            <span>Queued notes</span>
+                            <strong>{pendingNotes.length}</strong>
+                            <em>Local only</em>
+                        </div>
+                        <div className="signal-card">
+                            <span>Queued tasks</span>
+                            <strong>{pendingTasks.length}</strong>
+                            <em>Awaiting sync</em>
+                        </div>
+                        <div className="signal-card">
+                            <span>Last result</span>
+                            <strong>{syncResult ? syncResult.result : "Not run"}</strong>
+                            <em>{syncResult ? `${syncResult.syncedItems} synced` : "Ready to sync"}</em>
                         </div>
                     </div>
                     <div className="composer-grid">
@@ -371,6 +403,11 @@ const App = () => {
                             <p>
                                 Synced {syncResult.syncedItems} items, with {syncResult.remainingQueue} left in the local queue.
                             </p>
+                            <div className="sync-result__meta">
+                                <span>{syncResult.mergedNotes} notes merged</span>
+                                <span>{syncResult.mergedTasks} tasks merged</span>
+                                <span>{syncResult.conflicts.length} conflicts</span>
+                            </div>
                         </div>
                     ) : null}
                 </article>
@@ -392,8 +429,19 @@ const App = () => {
                         ))}
                         {pendingNotes.map((note) => (
                             <div className="stack-card stack-card--queued" key={note.id}>
-                                <strong>Queued note</strong>
-                                <span>local only</span>
+                                <div className="stack-card__actions">
+                                    <div>
+                                        <strong>Queued note</strong>
+                                        <span>local only</span>
+                                    </div>
+                                    <button
+                                        className="inline-action"
+                                        onClick={() => removeQueuedNote(note.id)}
+                                        type="button"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
                                 <p>{note.text}</p>
                             </div>
                         ))}
@@ -419,8 +467,19 @@ const App = () => {
                         ))}
                         {pendingTasks.map((task) => (
                             <div className="stack-card stack-card--queued" key={task.id}>
-                                <strong>{task.title}</strong>
-                                <span>queued</span>
+                                <div className="stack-card__actions">
+                                    <div>
+                                        <strong>{task.title}</strong>
+                                        <span>queued</span>
+                                    </div>
+                                    <button
+                                        className="inline-action"
+                                        onClick={() => removeQueuedTask(task.id)}
+                                        type="button"
+                                    >
+                                        Remove
+                                    </button>
+                                </div>
                             </div>
                         ))}
                         <ul className="simple-list">

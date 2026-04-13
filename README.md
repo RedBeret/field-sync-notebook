@@ -2,6 +2,8 @@
 
 Field Sync Notebook is an offline-first handoff and field-notes workspace for teams operating with degraded connectivity, shifting ownership, and time-sensitive tasks.
 
+![Field Sync Notebook preview](docs/preview.svg)
+
 This project is designed to show the workflow and resilience side of the portfolio:
 
 - offline-aware product thinking
@@ -16,6 +18,13 @@ This project is designed to show the workflow and resilience side of the portfol
 - Manual sync action with connection-mode awareness
 - Field notes, task cards, attachments, and conflict visibility
 - Exportable handoff summary after sync
+
+## What This Demonstrates
+
+- Designing around degraded connectivity instead of assuming perfect network conditions
+- Modeling local queue, sync, and conflict states in a way users can actually understand
+- Building workflow software for teams that need clean handoffs across shifts and locations
+- Treating resilience and clarity as product features, not afterthoughts
 
 ## Stack
 

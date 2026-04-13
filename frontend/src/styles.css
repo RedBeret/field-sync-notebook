@@ -199,6 +199,15 @@ textarea {
     gap: 14px;
 }
 
+.empty-state {
+    padding: 16px;
+    border: 1px dashed rgba(42, 58, 83, 0.16);
+    border-radius: 18px;
+    background: rgba(255, 255, 255, 0.72);
+    color: var(--muted);
+    line-height: 1.7;
+}
+
 .catalog-controls {
     grid-template-columns: 1fr 220px;
     margin-bottom: 16px;
@@ -324,6 +333,13 @@ textarea {
     margin: 18px 0;
 }
 
+.queue-summary {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+    margin-bottom: 18px;
+}
+
 .composer-card {
     display: grid;
     gap: 12px;
@@ -366,9 +382,25 @@ textarea {
     border-style: dashed;
 }
 
+.stack-card__actions {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    align-items: flex-start;
+}
+
 .stack-card--alert {
     border-color: rgba(248, 113, 113, 0.24);
     background: rgba(255, 244, 244, 0.88);
+}
+
+.inline-action {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: #0f8b8d;
+    cursor: pointer;
+    font-weight: 600;
 }
 
 .simple-list {
@@ -386,12 +418,22 @@ textarea {
     gap: 12px;
 }
 
+.sync-result__meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 12px;
+    color: var(--muted);
+    font-size: 14px;
+}
+
 @media (max-width: 1100px) {
     .hero,
     .content-grid,
     .content-grid--bottom,
     .metric-grid,
-    .composer-grid {
+    .composer-grid,
+    .queue-summary {
         grid-template-columns: 1fr;
     }
 
@@ -417,7 +459,8 @@ textarea {
 
     .panel-heading--split,
     .workspace-card__top,
-    .simple-list li {
+    .simple-list li,
+    .stack-card__actions {
         flex-direction: column;
         align-items: flex-start;
     }
