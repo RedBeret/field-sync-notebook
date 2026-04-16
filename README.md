@@ -1,36 +1,42 @@
 # Field Sync Notebook
 
-Field Sync Notebook is an offline-first handoff and field-notes workspace for teams operating with degraded connectivity, shifting ownership, and time-sensitive tasks.
+An offline-first field notes and handoff tool for operators working with spotty connectivity and shifting teams.
 
-![Field Sync Notebook preview](docs/preview.svg)
+The problem is straightforward: you're on shift, you're three bars of signal from nowhere, and the next operator needs to know what you actually found -- not what you think you told them, not what the whiteboard said two hours ago, but what's actually going on right now. Field Sync Notebook keeps notes, tasks, and attachments in sync across reconnects, and surfaces conflicts when the same record gets edited on both ends.
 
-This project is designed to show the workflow and resilience side of the portfolio:
+## How it works
 
-- offline-aware product thinking
-- sync queues and conflict handling
-- operator notes, tasks, and attachments in one place
-- pragmatic full-stack design for disconnected environments
+### Opening a shift
 
-## Current MVP
+You open the notebook. The workspace catalog shows you what's active. Your previous shift's handoff summary is right there -- what was flagged, what's in progress, what the outstanding issues are. You don't have to find someone to ask.
 
-- Workspace catalog with sync-state overview
-- Offline queue for pending notes and tasks
-- Manual sync action with connection-mode awareness
-- Field notes, task cards, attachments, and conflict visibility
-- Exportable handoff summary after sync
+### Making notes in the field
 
-## What This Demonstrates
+You create field notes, add tasks, attach photos. Everything writes locally first. You see a sync status badge on each item: synced, pending, or conflict. Pending means it's queued, waiting for connectivity.
 
-- Designing around degraded connectivity instead of assuming perfect network conditions
-- Modeling local queue, sync, and conflict states in a way users can actually understand
-- Building workflow software for teams that need clean handoffs across shifts and locations
-- Treating resilience and clarity as product features, not afterthoughts
+Signal drops. You keep working. Notes stay local, queued up. Nothing is lost.
 
-## Stack
+### Syncing
 
-- Frontend: React, TypeScript, Vite
-- Backend: FastAPI
-- Data: seeded workspace and sync-state payloads
+You get signal back. You hit Sync. The app pushes your local queue to the server and pulls any changes from teammates. Most of the time it just works -- your notes land, their notes land, everyone is current.
+
+### The conflict
+
+Sometimes both ends edit the same note. Maybe you updated the tank pressure reading at 14:00, and your teammate on the other shift did too -- from a different location, with different info. When you sync, Field Sync Notebook shows you the conflict: both versions, side by side, with timestamps.
+
+You read both. You pick the right one, or you merge the details. You resolve it and move on. No lost data, no guessing.
+
+### Handing off
+
+At shift end, you generate a handoff summary -- a clean export of your notes, tasks, and open conflicts. The next person opens their shift with a full picture.
+
+## Features
+
+- Workspace catalog with per-item sync state (synced / pending / conflict)
+- Offline-first notes and tasks with local queue
+- Conflict detection and resolution UI -- both versions shown, pick or merge
+- Manual sync with connection-mode awareness
+- Exportable handoff summary
 
 ## Local Development
 
