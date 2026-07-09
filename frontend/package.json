@@ -1,22 +1,33 @@
 {
-  "name": "field-sync-notebook-frontend",
+  "name": "field-sync-notebook",
   "private": true,
-  "version": "0.1.0",
+  "version": "1.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:run": "vitest run",
+    "check": "npm run test:run && npm run build"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.1.1",
+    "@fontsource/roboto-condensed": "^5.1.1",
+    "@vitejs/plugin-react": "latest",
+    "lucide-react": "^0.468.0",
+    "vite": "latest",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"
   },
   "devDependencies": {
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^5.0.0",
-    "typescript": "^5.9.3",
-    "vite": "^7.1.7"
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@testing-library/user-event": "^14.5.2",
+    "@types/react": "^18.3.18",
+    "@types/react-dom": "^18.3.5",
+    "jsdom": "^25.0.1",
+    "typescript": "~5.7.2",
+    "vitest": "^4.1.9"
   }
 }

@@ -1,551 +1,199 @@
-import { startTransition, useDeferredValue, useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, X } from "lucide-react";
+import { AddUpdateModal } from "./components/AddUpdateModal";
+import { ConflictModal, type ConflictChoice } from "./components/ConflictModal";
+import { HandoffModal } from "./components/HandoffModal";
+import { NetworkSettings } from "./components/NetworkSettings";
+import { Sidebar, type NavView } from "./components/Sidebar";
+import { SyncRail } from "./components/SyncRail";
+import { TopBar } from "./components/TopBar";
+import { UpdateDetails } from "./components/UpdateDetails";
+import { UpdateList } from "./components/UpdateList";
+import { freshSeedState } from "./data/seed";
+import { clearWorkspace, loadWorkspace, saveWorkspace } from "./lib/storage";
+import { syncWorkspace } from "./lib/sync";
+import type { FieldUpdate, NetworkMode, QueueItem, ViewFilter, WorkspaceState } from "./types";
 
-type WorkspaceSummary = {
-    id: string;
-    name: string;
-    region: string;
-    syncState: string;
-    pending: number;
-    summary: string;
-};
+type ModalState = "add" | "handoff" | "settings" | { type: "conflict"; updateId: string } | null;
 
-type Catalog = {
-    overview: {
-        workspaces: number;
-        pending: number;
-        offline: number;
-        degraded: number;
-    };
-    workspaces: WorkspaceSummary[];
-    defaultWorkspaceId: string;
-};
+const nowLabel = () => new Intl.DateTimeFormat("en-US", { hour: "2-digit", minute: "2-digit", hour12: false }).format(new Date());
 
-type WorkspaceDetail = {
-    id: string;
-    name: string;
-    region: string;
-    syncState: string;
-    lastSync: string;
-    summary: string;
-    notes: { author: string; time: string; text: string }[];
-    tasks: { title: string; owner: string; status: string }[];
-    attachments: { name: string; type: string }[];
-    conflicts: { title: string; detail: string }[];
-};
+function App() {
+  const [workspace, setWorkspace] = useState<WorkspaceState>(() => loadWorkspace());
+  const [activeView, setActiveView] = useState<NavView>("notebook");
+  const [filter, setFilter] = useState<ViewFilter>("all");
+  const [selectedId, setSelectedId] = useState(() => workspace.updates[0]?.id ?? "");
+  const [modal, setModal] = useState<ModalState>(null);
+  const [syncingId, setSyncingId] = useState<string>();
+  const [toast, setToast] = useState<string>();
 
-type SyncResult = {
-    workspaceId: string;
-    connectionMode: string;
-    result: string;
-    syncedItems: number;
-    remainingQueue: number;
-    mergedNotes: number;
-    mergedTasks: number;
-    conflicts: { title: string; detail: string }[];
-};
+  useEffect(() => saveWorkspace(workspace), [workspace]);
 
-type PendingNote = {
-    id: string;
-    text: string;
-};
+  useEffect(() => {
+    if (!toast) return undefined;
+    const timer = window.setTimeout(() => setToast(undefined), 4200);
+    return () => window.clearTimeout(timer);
+  }, [toast]);
 
-type PendingTask = {
-    id: string;
-    title: string;
-};
+  const selectedUpdate = useMemo(
+    () => workspace.updates.find((update) => update.id === selectedId),
+    [selectedId, workspace.updates],
+  );
 
-const syncModes = ["online", "degraded", "offline"];
+  const navigate = (view: NavView) => {
+    setActiveView(view);
+    if (view === "tasks") setFilter("task");
+    if (view === "notebook") setFilter("all");
+    if (view === "handoff") setModal("handoff");
+  };
 
-const App = () => {
-    const [catalog, setCatalog] = useState<Catalog | null>(null);
-    const [detail, setDetail] = useState<WorkspaceDetail | null>(null);
-    const [selectedWorkspaceId, setSelectedWorkspaceId] = useState("");
-    const [search, setSearch] = useState("");
-    const [syncMode, setSyncMode] = useState("degraded");
-    const [pendingNotes, setPendingNotes] = useState<PendingNote[]>([]);
-    const [pendingTasks, setPendingTasks] = useState<PendingTask[]>([]);
-    const [noteDraft, setNoteDraft] = useState("");
-    const [taskDraft, setTaskDraft] = useState("");
-    const [syncResult, setSyncResult] = useState<SyncResult | null>(null);
-    const [error, setError] = useState("");
-    const deferredSearch = useDeferredValue(search);
+  const runSync = async (queueId?: string) => {
+    if (syncingId) return;
+    setSyncingId(queueId ?? "all");
+    setWorkspace((current) => ({
+      ...current,
+      queue: current.queue.map((item) => !queueId || item.id === queueId ? { ...item, status: item.status === "conflict" ? "conflict" : "syncing" } : item),
+      updates: current.updates.map((update) => {
+        const queued = current.queue.find((item) => item.updateId === update.id && (!queueId || item.id === queueId));
+        return queued && update.status !== "conflict" ? { ...update, status: "syncing" } : update;
+      }),
+    }));
 
-    useEffect(() => {
-        fetch("/api/workspaces")
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error("Failed to load workspaces");
-                }
-
-                return response.json();
-            })
-            .then((payload: Catalog) => {
-                setCatalog(payload);
-                setSelectedWorkspaceId(payload.defaultWorkspaceId);
-            })
-            .catch(() =>
-                setError("Field Sync Notebook could not be loaded. Start the backend and try again.")
-            );
-    }, []);
-
-    useEffect(() => {
-        if (!selectedWorkspaceId) {
-            return;
-        }
-
-        fetch(`/api/workspaces/${selectedWorkspaceId}`)
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error("Failed to load workspace");
-                }
-
-                return response.json();
-            })
-            .then((payload: WorkspaceDetail) => {
-                startTransition(() => {
-                    setDetail(payload);
-                    setSyncMode(payload.syncState);
-                    setPendingNotes([]);
-                    setPendingTasks([]);
-                    setSyncResult(null);
-                    setNoteDraft("");
-                    setTaskDraft("");
-                });
-            })
-            .catch(() =>
-                setError("Workspace detail could not be loaded. Refresh and try again.")
-            );
-    }, [selectedWorkspaceId]);
-
-    if (error) {
-        return <main className="app-shell status-screen">{error}</main>;
+    try {
+      const snapshot = loadWorkspace();
+      const result = await syncWorkspace(snapshot, queueId);
+      setWorkspace((current) => ({ ...current, updates: result.updates, queue: result.queue, lastSyncedAt: nowLabel() }));
+      setToast(result.message);
+    } catch (error) {
+      setWorkspace((current) => ({
+        ...current,
+        queue: current.queue.map((item) => item.status === "syncing" ? { ...item, status: "queued" } : item),
+        updates: current.updates.map((update) => update.status === "syncing" ? { ...update, status: "queued" } : update),
+      }));
+      setToast(error instanceof Error ? error.message : "Sync could not complete.");
+    } finally {
+      setSyncingId(undefined);
     }
+  };
 
-    if (!catalog || !detail) {
-        return <main className="app-shell status-screen">Loading field notebook...</main>;
-    }
-
-    const filteredWorkspaces = catalog.workspaces.filter((workspace) => {
-        const haystack = `${workspace.name} ${workspace.region} ${workspace.summary}`.toLowerCase();
-        return haystack.includes(deferredSearch.trim().toLowerCase());
+  const removeQueueItem = (queueId: string) => {
+    setWorkspace((current) => {
+      const item = current.queue.find((candidate) => candidate.id === queueId);
+      return {
+        ...current,
+        queue: current.queue.filter((candidate) => candidate.id !== queueId),
+        updates: current.updates.map((update) => update.id === item?.updateId && update.status !== "conflict" ? { ...update, status: "error" } : update),
+      };
     });
+    setToast("Removed from the sync queue. The local update is still on this device.");
+  };
 
-    const queueCount = pendingNotes.length + pendingTasks.length;
-    const emptyWorkspaces = filteredWorkspaces.length === 0;
+  const addUpdate = (input: { kind: "note" | "task"; title: string; details: string; owner: string }) => {
+    const id = `local-${Date.now()}`;
+    const createdAt = `Today, ${nowLabel()}`;
+    const update: FieldUpdate = { id, ...input, author: "Alex D.", createdAt, status: "queued" };
+    const queueItem: QueueItem = { id: `queue-${id}`, updateId: id, kind: input.kind, title: input.title, createdAt, status: "queued" };
+    setWorkspace((current) => ({ ...current, updates: [update, ...current.updates], queue: [queueItem, ...current.queue] }));
+    setSelectedId(id);
+    setFilter("all");
+    setModal(null);
+    setToast("Update saved locally and added to the sync queue.");
+  };
 
-    const removeQueuedNote = (noteId: string) => {
-        setPendingNotes((current) => current.filter((note) => note.id !== noteId));
-    };
+  const resolveConflict = (choice: ConflictChoice) => {
+    if (!modal || typeof modal === "string" || modal.type !== "conflict") return;
+    const updateId = modal.updateId;
+    setWorkspace((current) => ({
+      ...current,
+      updates: current.updates.map((update) => {
+        if (update.id !== updateId) return update;
+        const details = choice === "remote" ? update.remoteDetails ?? update.details : choice === "merge" ? `${update.details}\n\nRemote note: ${update.remoteDetails ?? ""}` : update.details;
+        return { ...update, details, status: "queued", remoteDetails: undefined, remoteAuthor: undefined, remoteCreatedAt: undefined };
+      }),
+      queue: current.queue.map((item) => item.updateId === updateId ? { ...item, status: "queued" } : item),
+    }));
+    setModal(null);
+    setToast("Conflict resolved. The chosen version is queued to sync.");
+  };
 
-    const removeQueuedTask = (taskId: string) => {
-        setPendingTasks((current) => current.filter((task) => task.id !== taskId));
-    };
+  const exportHandoff = (ids: string[], note: string) => {
+    const selected = workspace.updates.filter((update) => ids.includes(update.id));
+    const lines = [
+      "# Harbor Relay — Shift Handoff",
+      "",
+      `Prepared by Alex D. at ${new Date().toLocaleString()}`,
+      "",
+      "## Handoff note",
+      note || "No additional note.",
+      "",
+      "## Updates",
+      ...selected.flatMap((update) => [
+        `### ${update.title}`,
+        `- Type: ${update.kind}`,
+        `- Owner: ${update.owner}`,
+        `- Sync state: ${update.status}`,
+        `- Recorded: ${update.createdAt}`,
+        "",
+        update.details,
+        "",
+      ]),
+    ];
+    const blob = new Blob([lines.join("\n")], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = "harbor-relay-handoff.md";
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setModal(null);
+    setToast("Handoff summary exported.");
+  };
 
-    const addNote = () => {
-        if (!noteDraft.trim()) {
-            return;
-        }
+  const setNetworkMode = (networkMode: NetworkMode) => {
+    setWorkspace((current) => ({ ...current, networkMode }));
+    setToast(`Connection mode set to ${networkMode}.`);
+    setModal(null);
+  };
 
-        setPendingNotes((current) => [
-            ...current,
-            {
-                id: `note-${Date.now()}`,
-                text: noteDraft.trim(),
-            },
-        ]);
-        setNoteDraft("");
-    };
+  const resetDemo = () => {
+    clearWorkspace();
+    const fresh = freshSeedState();
+    setWorkspace(fresh);
+    setSelectedId(fresh.updates[0].id);
+    setFilter("all");
+    setActiveView("notebook");
+    setModal(null);
+    setToast("Demo data reset.");
+  };
 
-    const addTask = () => {
-        if (!taskDraft.trim()) {
-            return;
-        }
+  return (
+    <div className="app-shell">
+      <Sidebar activeView={activeView} networkMode={workspace.networkMode} onNavigate={navigate} onOpenNetwork={() => setModal("settings")} />
+      <div className="app-frame">
+        <TopBar lastSyncedAt={workspace.lastSyncedAt} networkMode={workspace.networkMode} onOpenSettings={() => setModal("settings")} onSync={() => runSync()} syncing={syncingId === "all"} />
+        <div className="workspace-layout">
+          <main className="notebook-pane">
+            <div className="page-heading">
+              <h1>{activeView === "tasks" ? "Shift tasks" : "Shift notebook"}</h1>
+              <p>Local changes stay on this device until sync.</p>
+            </div>
+            <UpdateList filter={filter} onAdd={() => setModal("add")} onFilter={setFilter} onSelect={setSelectedId} selectedId={selectedId} updates={workspace.updates} />
+            <UpdateDetails onResolve={(updateId) => setModal({ type: "conflict", updateId })} update={selectedUpdate} />
+            <p className="update-count">{workspace.updates.length} updates</p>
+          </main>
+          <SyncRail onHandoff={() => setModal("handoff")} onRemove={removeQueueItem} onRetry={(id) => runSync(id)} onRetryAll={() => runSync()} queue={workspace.queue} syncingId={syncingId} />
+        </div>
+      </div>
 
-        setPendingTasks((current) => [
-            ...current,
-            {
-                id: `task-${Date.now()}`,
-                title: taskDraft.trim(),
-            },
-        ]);
-        setTaskDraft("");
-    };
-
-    const runSync = () => {
-        fetch(`/api/workspaces/${detail.id}/sync`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-            },
-            body: JSON.stringify({
-                connectionMode: syncMode,
-                pendingNotes,
-                pendingTasks,
-            }),
-        })
-            .then((response) => {
-                if (!response.ok) {
-                    throw new Error("Failed to sync workspace");
-                }
-
-                return response.json();
-            })
-            .then((payload: SyncResult) => {
-                setSyncResult(payload);
-
-                if (payload.remainingQueue === 0) {
-                    setPendingNotes([]);
-                    setPendingTasks([]);
-                } else {
-                    setPendingNotes((current) => current.slice(Math.floor(current.length / 2)));
-                    setPendingTasks((current) => current.slice(Math.floor(current.length / 2)));
-                }
-            })
-            .catch(() =>
-                setError("Sync request failed. Check the backend and try again.")
-            );
-    };
-
-    const downloadSummary = () => {
-        const packet = {
-            workspace: detail.name,
-            syncMode,
-            pendingNotes,
-            pendingTasks,
-            syncResult,
-        };
-        const blob = new Blob([JSON.stringify(packet, null, 2)], {
-            type: "application/json",
-        });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `${detail.id.toLowerCase()}-handoff.json`;
-        link.click();
-        URL.revokeObjectURL(url);
-    };
-
-    return (
-        <main className="app-shell">
-            <section className="hero">
-                <div>
-                    <p className="eyebrow">Field Sync Notebook</p>
-                    <h1>Keep field notes, tasks, and handoffs moving when the network doesn’t.</h1>
-                    <p className="hero-copy">
-                        An offline-first notes and task workspace built for degraded comms,
-                        shifting ownership, and fast handoffs.
-                    </p>
-                    <div className="hero-tags">
-                        <span>Offline queue</span>
-                        <span>Sync recovery</span>
-                        <span>Shift handoff</span>
-                    </div>
-                </div>
-                <div className="hero-panel">
-                    <div className="hero-panel__header">
-                        <span>Current workspace</span>
-                        <span className={`connection-badge connection-badge--${syncMode}`}>
-                            {syncMode}
-                        </span>
-                    </div>
-                    <strong>{detail.name}</strong>
-                    <p>{detail.summary}</p>
-                    <div className="hero-panel__meta">
-                        <span>{detail.region}</span>
-                        <span>Last sync: {detail.lastSync}</span>
-                        <span>{detail.syncState}</span>
-                    </div>
-                </div>
-            </section>
-
-            <section className="metric-grid">
-                <article className="metric-card">
-                    <span>Workspaces</span>
-                    <strong>{catalog.overview.workspaces}</strong>
-                </article>
-                <article className="metric-card">
-                    <span>Pending items</span>
-                    <strong>{catalog.overview.pending + queueCount}</strong>
-                </article>
-                <article className="metric-card">
-                    <span>Offline</span>
-                    <strong>{catalog.overview.offline}</strong>
-                </article>
-                <article className="metric-card">
-                    <span>Degraded</span>
-                    <strong>{catalog.overview.degraded}</strong>
-                </article>
-            </section>
-
-            <section className="content-grid">
-                <article className="panel">
-                    <div className="panel-heading">
-                        <p className="eyebrow">Workspace catalog</p>
-                        <h2>Team notebooks</h2>
-                    </div>
-                    <label className="control">
-                        <span>Search</span>
-                        <input
-                            type="search"
-                            placeholder="San Diego, recovery, relay..."
-                            value={search}
-                            onChange={(event) => setSearch(event.target.value)}
-                        />
-                    </label>
-                    {emptyWorkspaces ? (
-                        <div className="empty-state">
-                            No workspaces match the current search.
-                        </div>
-                    ) : (
-                        <div className="workspace-list">
-                            {filteredWorkspaces.map((workspace) => (
-                                <button
-                                    key={workspace.id}
-                                    className={`workspace-card${
-                                        workspace.id === detail.id ? " is-active" : ""
-                                    }`}
-                                    onClick={() => setSelectedWorkspaceId(workspace.id)}
-                                    type="button"
-                                >
-                                    <div className="workspace-card__top">
-                                        <div>
-                                            <strong>{workspace.name}</strong>
-                                            <span>{workspace.region}</span>
-                                        </div>
-                                        <span className={`badge badge--${workspace.syncState}`}>
-                                            {workspace.syncState}
-                                        </span>
-                                    </div>
-                                    <p>{workspace.summary}</p>
-                                    <div className="workspace-card__meta">
-                                        <span>{workspace.pending} pending</span>
-                                    </div>
-                                </button>
-                            ))}
-                        </div>
-                    )}
-                </article>
-
-                <article className="panel">
-                    <div className="panel-heading panel-heading--split">
-                        <div>
-                            <p className="eyebrow">Queue and sync</p>
-                            <h2>Keep work moving</h2>
-                        </div>
-                        <button className="export-button" onClick={downloadSummary} type="button">
-                            Export handoff
-                        </button>
-                    </div>
-                    <div className="catalog-controls">
-                        <label className="control">
-                            <span>Connection mode</span>
-                            <select
-                                value={syncMode}
-                                onChange={(event) => setSyncMode(event.target.value)}
-                            >
-                                {syncModes.map((mode) => (
-                                    <option key={mode} value={mode}>
-                                        {mode.charAt(0).toUpperCase() + mode.slice(1)}
-                                    </option>
-                                ))}
-                            </select>
-                        </label>
-                        <div className="signal-card">
-                            <span>Queued right now</span>
-                            <strong>{queueCount}</strong>
-                            <em className={`trend trend--${syncMode}`}>
-                                {syncMode}
-                            </em>
-                        </div>
-                    </div>
-                    <div className="queue-summary">
-                        <div className="signal-card">
-                            <span>Queued notes</span>
-                            <strong>{pendingNotes.length}</strong>
-                            <em>Local only</em>
-                        </div>
-                        <div className="signal-card">
-                            <span>Queued tasks</span>
-                            <strong>{pendingTasks.length}</strong>
-                            <em>Awaiting sync</em>
-                        </div>
-                        <div className="signal-card">
-                            <span>Last result</span>
-                            <strong>{syncResult ? syncResult.result : "Not run"}</strong>
-                            <em>{syncResult ? `${syncResult.syncedItems} synced` : "Ready to sync"}</em>
-                        </div>
-                    </div>
-                    <div className="composer-grid">
-                        <div className="composer-card">
-                            <span>Add note</span>
-                            <textarea
-                                value={noteDraft}
-                                onChange={(event) => setNoteDraft(event.target.value)}
-                                onKeyDown={(event) => {
-                                    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-                                        event.preventDefault();
-                                        addNote();
-                                    }
-                                }}
-                                placeholder="Log what happened while it is still fresh."
-                            />
-                            <div className="composer-footer">
-                                <button className="action-button" onClick={addNote} type="button">
-                                    Queue note
-                                </button>
-                                <span className="composer-hint">Ctrl+Enter</span>
-                            </div>
-                        </div>
-                        <div className="composer-card">
-                            <span>Add task</span>
-                            <textarea
-                                value={taskDraft}
-                                onChange={(event) => setTaskDraft(event.target.value)}
-                                onKeyDown={(event) => {
-                                    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
-                                        event.preventDefault();
-                                        addTask();
-                                    }
-                                }}
-                                placeholder="Capture the follow-up before the next shift arrives."
-                            />
-                            <div className="composer-footer">
-                                <button className="action-button" onClick={addTask} type="button">
-                                    Queue task
-                                </button>
-                                <span className="composer-hint">Ctrl+Enter</span>
-                            </div>
-                        </div>
-                    </div>
-                    <button className="primary-button" onClick={runSync} type="button">
-                        Run sync
-                    </button>
-                    {syncResult ? (
-                        <div className="sync-result">
-                            <strong>{syncResult.result}</strong>
-                            <p>
-                                Synced {syncResult.syncedItems} items, with {syncResult.remainingQueue} left in the local queue.
-                            </p>
-                            <div className="sync-result__meta">
-                                <span>{syncResult.mergedNotes} notes merged</span>
-                                <span>{syncResult.mergedTasks} tasks merged</span>
-                                <span>{syncResult.conflicts.length} conflicts</span>
-                            </div>
-                        </div>
-                    ) : null}
-                </article>
-            </section>
-
-            <section className="content-grid content-grid--bottom">
-                <article className="panel">
-                    <div className="panel-heading">
-                        <p className="eyebrow">Field notes</p>
-                        <h2>What happened</h2>
-                    </div>
-                    <div className="stack-list">
-                        {detail.notes.map((note) => (
-                            <div className="stack-card" key={`${note.author}-${note.time}`}>
-                                <strong>{note.author}</strong>
-                                <span>{note.time}</span>
-                                <p>{note.text}</p>
-                            </div>
-                        ))}
-                        {pendingNotes.map((note) => (
-                            <div className="stack-card stack-card--queued" key={note.id}>
-                                <div className="stack-card__actions">
-                                    <div>
-                                        <strong>Queued note</strong>
-                                        <span>local only</span>
-                                    </div>
-                                    <button
-                                        className="inline-action"
-                                        onClick={() => removeQueuedNote(note.id)}
-                                        type="button"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                                <p>{note.text}</p>
-                            </div>
-                        ))}
-                    </div>
-                </article>
-
-                <article className="panel">
-                    <div className="panel-heading">
-                        <p className="eyebrow">Tasks and attachments</p>
-                        <h2>Carry it forward</h2>
-                    </div>
-                    <div className="stack-list">
-                        {detail.tasks.map((task) => (
-                            <div className="stack-card" key={task.title}>
-                                <div className="workspace-card__top">
-                                    <strong>{task.title}</strong>
-                                    <span className={`badge badge--${task.status}`}>
-                                        {task.status}
-                                    </span>
-                                </div>
-                                <p>{task.owner}</p>
-                            </div>
-                        ))}
-                        {pendingTasks.map((task) => (
-                            <div className="stack-card stack-card--queued" key={task.id}>
-                                <div className="stack-card__actions">
-                                    <div>
-                                        <strong>{task.title}</strong>
-                                        <span>queued</span>
-                                    </div>
-                                    <button
-                                        className="inline-action"
-                                        onClick={() => removeQueuedTask(task.id)}
-                                        type="button"
-                                    >
-                                        Remove
-                                    </button>
-                                </div>
-                            </div>
-                        ))}
-                        <ul className="simple-list">
-                            {detail.attachments.map((attachment) => (
-                                <li key={attachment.name}>
-                                    <strong>{attachment.name}</strong>
-                                    <span>{attachment.type}</span>
-                                </li>
-                            ))}
-                        </ul>
-                    </div>
-                </article>
-
-                <article className="panel">
-                    <div className="panel-heading">
-                        <p className="eyebrow">Conflicts</p>
-                        <h2>Resolve after reconnect</h2>
-                    </div>
-                    <div className="stack-list">
-                        {detail.conflicts.length ? (
-                            detail.conflicts.map((conflict) => (
-                                <div className="stack-card stack-card--alert" key={conflict.title}>
-                                    <strong>{conflict.title}</strong>
-                                    <p>{conflict.detail}</p>
-                                </div>
-                            ))
-                        ) : (
-                            <div className="stack-card">
-                                <strong>No conflicts</strong>
-                                <p>This workspace is currently clean.</p>
-                            </div>
-                        )}
-                        {syncResult?.conflicts.map((conflict) => (
-                            <div className="stack-card stack-card--alert" key={`sync-${conflict.title}`}>
-                                <strong>{conflict.title}</strong>
-                                <p>{conflict.detail}</p>
-                            </div>
-                        ))}
-                    </div>
-                </article>
-            </section>
-        </main>
-    );
-};
+      {modal === "add" ? <AddUpdateModal onClose={() => setModal(null)} onSave={addUpdate} /> : null}
+      {modal === "handoff" ? <HandoffModal onClose={() => setModal(null)} onExport={exportHandoff} updates={workspace.updates} /> : null}
+      {modal === "settings" ? <NetworkSettings current={workspace.networkMode} onChange={setNetworkMode} onClose={() => setModal(null)} onReset={resetDemo} /> : null}
+      {modal && typeof modal === "object" && modal.type === "conflict" ? (
+        <ConflictModal onChoose={resolveConflict} onClose={() => setModal(null)} update={workspace.updates.find((update) => update.id === modal.updateId)!} />
+      ) : null}
+      {toast ? <div aria-live="polite" className="toast"><CheckCircle2 aria-hidden="true" size={18} /><span>{toast}</span><button aria-label="Dismiss notification" onClick={() => setToast(undefined)} type="button"><X aria-hidden="true" size={16} /></button></div> : null}
+    </div>
+  );
+}
 
 export default App;
