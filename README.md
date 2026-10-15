@@ -1,50 +1,36 @@
 # Field Sync Notebook
 
-Field Sync Notebook is an offline-first handoff and field-notes workspace for teams operating with degraded connectivity, shifting ownership, and time-sensitive tasks.
+[![CI](https://github.com/RedBeret/field-sync-notebook/actions/workflows/ci.yml/badge.svg)](https://github.com/RedBeret/field-sync-notebook/actions/workflows/ci.yml)
 
-![Field Sync Notebook preview](docs/preview.svg)
+An offline-first notes, tasks, sync-queue, and shift-handoff workspace for teams operating with degraded connectivity and changing ownership.
 
-This project is designed to show the workflow and resilience side of the portfolio:
+The app makes resilience visible: every local change has a clear state, queue actions are explicit, conflicts can be resolved without guesswork, and the next shift receives an exportable handoff instead of scattered context.
 
-- offline-aware product thinking
-- sync queues and conflict handling
-- operator notes, tasks, and attachments in one place
-- pragmatic full-stack design for disconnected environments
+## What works
 
-## Current MVP
+- Create notes or tasks and persist them locally between reloads.
+- Switch among online, degraded, and offline demo modes.
+- Manually sync all changes or retry/remove one queued change.
+- See deterministic degraded-mode results and a safe offline error path.
+- Compare local and remote versions, then keep, replace, or merge a conflict.
+- Export a selected shift handoff as Markdown.
+- Install the production build as a small offline-capable web app.
+- Exercise equivalent sync and handoff behavior through the FastAPI service.
 
-- Workspace catalog with sync-state overview
-- Offline queue for pending notes and tasks
-- Manual sync action with connection-mode awareness
-- Field notes, task cards, attachments, and conflict visibility
-- Exportable handoff summary after sync
-
-## What This Demonstrates
-
-- Designing around degraded connectivity instead of assuming perfect network conditions
-- Modeling local queue, sync, and conflict states in a way users can actually understand
-- Building workflow software for teams that need clean handoffs across shifts and locations
-- Treating resilience and clarity as product features, not afterthoughts
-
-## Stack
-
-- Frontend: React, TypeScript, Vite
-- Backend: FastAPI
-- Data: seeded workspace and sync-state payloads
-
-## Local Development
-
-### Backend
+## Quick start
 
 ```bash
-cd backend
-python -m venv .venv
-.venv\Scripts\activate
-pip install -r requirements.txt
-uvicorn app.main:app --reload --port 8030
+# Windows
+run.bat
+
+# Linux / macOS
+bash start.sh
 ```
 
-### Frontend
+- Backend: `http://127.0.0.1:8000`
+- Frontend: `http://127.0.0.1:4173`
+
+## Run the client
 
 ```bash
 cd frontend
@@ -52,10 +38,32 @@ npm install
 npm run dev
 ```
 
-The Vite dev server proxies API traffic to `http://127.0.0.1:8030`.
+Open `http://127.0.0.1:4173`.
 
-## Verification
+## Run the API
 
-- `python -m unittest discover -s backend\tests -v`
-- `python -m compileall backend\app`
-- `npm run build`
+```bash
+cd backend
+python -m venv .venv
+.venv/Scripts/pip install -r requirements.txt
+.venv/Scripts/uvicorn app.main:app --reload --port 8000
+```
+
+The API docs are available at `http://127.0.0.1:8000/docs`.
+
+## Verify
+
+```bash
+cd frontend
+npm run check
+
+cd ../backend
+python -m pytest tests
+```
+
+## Design references
+
+- `docs/design/field-sync-primary.png` — complete primary desktop surface.
+- `docs/design/field-sync-states.png` — add, conflict, and handoff state details.
+
+The production UI is code-native; the reference images are specifications, not screenshots embedded in the app.

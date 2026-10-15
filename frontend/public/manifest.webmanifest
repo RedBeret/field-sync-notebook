@@ -1,0 +1,9 @@
+{
+  "name": "Field Sync Notebook",
+  "short_name": "Field Sync",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f1e8",
+  "theme_color": "#1d211f",
+  "description": "Offline-first field notes, tasks, sync, and shift handoffs."
+}
